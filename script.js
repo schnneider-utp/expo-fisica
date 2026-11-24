@@ -633,6 +633,7 @@ function simulator() {
     theta = mode === "static" ? staticTheta : 0;
     omega = 0;
     pushImpulse = 0;
+    resistTimer = 0;
     graphData = [];
     graphTime = 0;
   }
@@ -861,6 +862,28 @@ function simulator() {
     label(ctx, mode === "static"
       ? "Modo estático: la puerta permanece en equilibrio (τ neto = 0)"
       : "Modo dinámico: τ neto ≠ 0 → la puerta gira", 16, 24, C.muted, 12.5, "left");
+
+    // etiqueta flotante tras pulsar "Empujar"
+    if (pushToast && pushToast.t > 0) {
+      const p = 1 - pushToast.t / 1.8;          // 0 → 1 durante la vida del toast
+      const alpha = Math.min(1, pushToast.t * 2.5);
+      const y = h * 0.42 - p * 34;               // flota hacia arriba
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      const text = pushToast.text;
+      ctx.font = '600 15px "IBM Plex Mono", monospace';
+      const tw = ctx.measureText(text).width + 30;
+      const tx = w / 2 - tw / 2;
+      ctx.fillStyle = "rgba(8,12,20,0.92)";
+      ctx.strokeStyle = pushToast.color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(tx, y - 16, tw, 32, 16) : ctx.rect(tx, y - 16, tw, 32);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      label(ctx, text, w / 2, y, pushToast.color, 15, "center", true);
+    }
   }
 
   /* ---------- Panel de lecturas ---------- */
@@ -882,7 +905,9 @@ function simulator() {
     out.eq.textContent = `${tau.toFixed(2)} = ${I.toFixed(2)} · ${alpha.toFixed(2)}`;
 
     let state;
-    if (mode === "static") state = "⚡ Equilibrio (τ = 0)";
+    if (mode === "static") {
+      state = resistTimer > 0 ? "🛡 Resistiendo…" : "⚡ Equilibrio (τ = 0)";
+    }
     else if (Math.abs(omega) < 0.05 && Math.abs(alpha) < 0.05) state = "En reposo";
     else if (omega > 0.05) state = "▲ Girando (antihorario)";
     else if (omega < -0.05) state = "▼ Girando (horario)";
@@ -997,6 +1022,12 @@ function simulator() {
 
     if (!reduceMotion || document.hasFocus()) {
       physics(dt);
+
+      // decae la etiqueta flotante del empujón
+      if (pushToast) {
+        pushToast.t -= dt;
+        if (pushToast.t <= 0) pushToast = null;
+      }
 
       graphTime += dt;
       graphAcc += dt;
