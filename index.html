@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simulador de Torque · Física</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="grid-bg" aria-hidden="true"></div>
+
+  <!-- ============ HERO ============ -->
+  <header class="hero">
+    <div class="hero-inner">
+      <span class="badge">Laboratorio de Mecánica · Rotación</span>
+      <h1>Simulador de <span class="grad">Torque</span></h1>
+      <p class="lead">
+        Explora el momento de fuerza desde cero: torque estático, torque dinámico,
+        aceleración angular y la relación <em>τ = I·α</em>, todo animado con un caso real:
+        <strong>una puerta girando sobre su bisagra</strong>.
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="#simulador">Probar el simulador</a>
+        <a class="btn btn-ghost" href="#torque-estatico">Ver los conceptos</a>
+      </div>
+      <div class="hero-visual">
+        <canvas id="heroCanvas" width="760" height="320" aria-hidden="true"></canvas>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ============ 1. TORQUE ESTÁTICO ============ -->
+    <section class="concept" id="torque-estatico">
+      <div class="concept-grid">
+        <div class="concept-text reveal">
+          <span class="tag tag-cyan">01 · Equilibrio</span>
+          <h2>Torque estático</h2>
+          <p>
+            Cuando la suma de todos los torques que actúan sobre un cuerpo es <strong>cero</strong>,
+            el objeto no rota. Está en <em>equilibrio rotacional</em>: los torques que intentan
+            girarlo en un sentido se cancelan con los que lo giran en el otro.
+          </p>
+          <div class="formula">
+            <span class="f-part f-cyan">τ<sub>neto</sub></span>
+            <span class="f-op">=</span>
+            <span class="f-part f-amber">τ<sub>1</sub></span>
+            <span class="f-op">−</span>
+            <span class="f-part f-magenta">τ<sub>2</sub></span>
+            <span class="f-op">=</span>
+            <span class="f-part f-zero">0</span>
+          </div>
+          <ul class="keypoints">
+            <li><span class="dot dot-amber"></span> τ = F · d · sen(θ) — torque de una fuerza</li>
+            <li><span class="dot dot-magenta"></span> Si τ<sub>neto</sub> = 0 → ω constante (¡o cero!)</li>
+            <li><span class="dot dot-cyan"></span> Ejemplo: sostienes una puerta abierta sin que se mueva</li>
+          </ul>
+        </div>
+        <div class="concept-viz reveal">
+          <canvas id="staticCanvas" width="520" height="400"></canvas>
+          <div class="viz-caption">Puerta en equilibrio · los torques se cancelan</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 2. TORQUE DINÁMICO ============ -->
+    <section class="concept alt" id="torque-dinamico">
+      <div class="concept-grid reverse">
+        <div class="concept-text reveal">
+          <span class="tag tag-amber">02 · En movimiento</span>
+          <h2>Torque dinámico</h2>
+          <p>
+            Cuando los torques <strong>no se cancelan</strong>, queda un torque neto que
+            cambia el estado de rotación del cuerpo: lo hace arrancar, acelerar o frenar.
+            Ese es el <em>torque dinámico</em>.
+          </p>
+          <div class="formula">
+            <span class="f-part f-amber">τ<sub>neto</sub></span>
+            <span class="f-op">≠</span>
+            <span class="f-part f-zero">0</span>
+            <span class="f-op">→</span>
+            <span class="f-part f-magenta">ω</span>
+            <span class="f-op">varía</span>
+          </div>
+          <ul class="keypoints">
+            <li><span class="dot dot-amber"></span> Empujas la puerta → gira y sigue girando</li>
+            <li><span class="dot dot-magenta"></span> Más fuerza o más brazo → gira más rápido</li>
+            <li><span class="dot dot-cyan"></span> Sin fricción, la rotación no se detendría</li>
+          </ul>
+        </div>
+        <div class="concept-viz reveal">
+          <canvas id="dynamicCanvas" width="520" height="400"></canvas>
+          <div class="viz-caption">Torque neto desbalanceado · la puerta acelera</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 3. ACELERACIÓN ANGULAR ============ -->
+    <section class="concept" id="aceleracion-angular">
+      <div class="concept-grid">
+        <div class="concept-text reveal">
+          <span class="tag tag-magenta">03 · Cambio de ω</span>
+          <h2>Aceleración angular</h2>
+          <p>
+            La aceleración angular <strong>α</strong> mide qué tan rápido cambia la
+            velocidad angular. Si es positiva, la puerta acelera; si es negativa, frena.
+            Es el equivalente rotacional de la aceleración lineal.
+          </p>
+          <div class="formula">
+            <span class="f-part f-magenta">α</span>
+            <span class="f-op">=</span>
+            <span class="frac">
+              <span class="num f-magenta">Δω</span>
+              <span class="den">Δt</span>
+            </span>
+            <span class="f-op">=</span>
+            <span class="frac">
+              <span class="num f-magenta">ω<sub>f</sub> − ω<sub>0</sub></span>
+              <span class="den">t</span>
+            </span>
+          </div>
+          <ul class="keypoints">
+            <li><span class="dot dot-magenta"></span> Unidad: rad/s²</li>
+            <li><span class="dot dot-amber"></span> Gráfica ω vs t → la pendiente es α</li>
+            <li><span class="dot dot-cyan"></span> Constante si el torque es constante</li>
+          </ul>
+        </div>
+        <div class="concept-viz reveal">
+          <canvas id="angularCanvas" width="520" height="400"></canvas>
+          <div class="viz-caption">Gráfica ω vs t · la pendiente es la aceleración α</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 4. RELACIÓN τ = I·α ============ -->
+    <section class="concept alt" id="relacion">
+      <div class="concept-grid reverse">
+        <div class="concept-text reveal">
+          <span class="tag tag-amber">04 · La segunda ley de Newton, versión rotación</span>
+          <h2>Relación entre torque y aceleración angular</h2>
+          <p>
+            Así como <em>F = m·a</em> en traslación, en rotación tenemos
+            <strong>τ = I·α</strong>: el torque neto es igual al momento de inercia
+            multiplicado por la aceleración angular. La inercia <em>I</em> es la
+            "resistencia a girar" del cuerpo.
+          </p>
+          <div class="formula big">
+            <span class="f-part f-amber">τ</span>
+            <span class="f-op">=</span>
+            <span class="f-part f-cyan">I</span>
+            <span class="f-op">·</span>
+            <span class="f-part f-magenta">α</span>
+          </div>
+          <div class="formula-note">
+            <div><span class="chip chip-amber">τ</span> torque neto (N·m)</div>
+            <div><span class="chip chip-cyan">I</span> momento de inercia (kg·m²)</div>
+            <div><span class="chip chip-magenta">α</span> aceleración angular (rad/s²)</div>
+          </div>
+          <p class="note">
+            Para una puerta (placa rectangular girando por un borde):
+            <strong class="mono">I = ⅓ · m · L²</strong>. Más masa o más ancho → más I →
+            menos α con el mismo torque.
+          </p>
+        </div>
+        <div class="concept-viz reveal">
+          <canvas id="relationCanvas" width="520" height="400"></canvas>
+          <div class="viz-caption">Mismo τ, distinta I → distinta α</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SIMULADOR ============ -->
+    <section class="simulator" id="simulador">
+      <div class="sim-header reveal">
+        <span class="tag tag-cyan">Simulador interactivo</span>
+        <h2>Caso real: una puerta girando</h2>
+        <p>Ajusta los controles y observa cómo se comporta la puerta en tiempo real.</p>
+      </div>
+
+      <div class="sim-layout">
+        <!-- Controles -->
+        <aside class="panel controls reveal">
+          <h3>Controles</h3>
+
+          <div class="mode-toggle" role="tablist" aria-label="Modo">
+            <button class="mode-btn active" data-mode="static" role="tab">Estático</button>
+            <button class="mode-btn" data-mode="dynamic" role="tab">Dinámico</button>
+          </div>
+
+          <label class="control">
+            <span class="control-label">Fuerza aplicada <b id="forceVal">60</b> N</span>
+            <input type="range" id="force" min="0" max="150" value="60" step="1" />
+          </label>
+
+          <label class="control">
+            <span class="control-label">Punto de aplicación <b id="distVal">0.80</b> m del eje</span>
+            <input type="range" id="dist" min="0.05" max="1" value="0.8" step="0.01" />
+          </label>
+
+          <label class="control">
+            <span class="control-label">Ángulo de la fuerza <b id="angleVal">90</b>°</span>
+            <input type="range" id="angle" min="0" max="180" value="90" step="1" />
+          </label>
+
+          <label class="control">
+            <span class="control-label">Masa de la puerta <b id="massVal">25</b> kg</span>
+            <input type="range" id="mass" min="5" max="80" value="25" step="1" />
+          </label>
+
+          <label class="control">
+            <span class="control-label">Ancho de la puerta <b id="widthVal">0.90</b> m</span>
+            <input type="range" id="width" min="0.5" max="1.4" value="0.9" step="0.01" />
+          </label>
+
+          <label class="control">
+            <span class="control-label">Fricción de la bisagra <b id="fricVal">0.6</b></span>
+            <input type="range" id="fric" min="0" max="3" value="0.6" step="0.05" />
+          </label>
+
+          <div class="btn-row">
+            <button class="btn btn-primary btn-sm" id="pushBtn">💪 Empujar</button>
+            <button class="btn btn-ghost btn-sm" id="resetBtn">↺ Reiniciar</button>
+          </div>
+
+          <div class="presets">
+            <span class="control-label">Ejemplos rápidos</span>
+            <div class="btn-row">
+              <button class="btn chip-btn" data-preset="light">Puerta ligera</button>
+              <button class="btn chip-btn" data-preset="heavy">Puerta pesada</button>
+              <button class="btn chip-btn" data-preset="edge">Borde lejano</button>
+            </div>
+          </div>
+        </aside>
+
+        <!-- Visor -->
+        <div class="panel viewport reveal">
+          <canvas id="simCanvas" width="720" height="460"></canvas>
+          <div class="legend">
+            <span><i class="swatch sw-amber"></i> Fuerza F</span>
+            <span><i class="swatch sw-cyan"></i> Brazo r</span>
+            <span><i class="swatch sw-magenta"></i> Velocidad ω</span>
+            <span><i class="swatch sw-white"></i> Torque τ</span>
+          </div>
+        </div>
+
+        <!-- Lecturas -->
+        <aside class="panel readout reveal">
+          <h3>Lecturas en vivo</h3>
+          <div class="readout-grid">
+            <div class="ro ro-amber">
+              <span class="ro-label">Torque τ</span>
+              <span class="ro-value"><b id="roTorque">0.00</b> <small>N·m</small></span>
+            </div>
+            <div class="ro ro-cyan">
+              <span class="ro-label">Inercia I</span>
+              <span class="ro-value"><b id="roInertia">1.35</b> <small>kg·m²</small></span>
+            </div>
+            <div class="ro ro-magenta">
+              <span class="ro-label">Acel. angular α</span>
+              <span class="ro-value"><b id="roAlpha">0.00</b> <small>rad/s²</small></span>
+            </div>
+            <div class="ro ro-white">
+              <span class="ro-label">Vel. angular ω</span>
+              <span class="ro-value"><b id="roOmega">0.00</b> <small>rad/s</small></span>
+            </div>
+            <div class="ro ro-white">
+              <span class="ro-label">Ángulo θ</span>
+              <span class="ro-value"><b id="roTheta">0</b> <small>°</small></span>
+            </div>
+            <div class="ro ro-white">
+              <span class="ro-label">Estado</span>
+              <span class="ro-value ro-state" id="roState">En reposo</span>
+            </div>
+          </div>
+
+          <div class="formula-live">
+            <span class="f-part f-amber">τ</span>
+            <span class="f-op">=</span>
+            <span class="f-part f-cyan">I</span>
+            <span class="f-op">·</span>
+            <span class="f-part f-magenta">α</span>
+            <span class="f-op">⇒</span>
+            <span class="live-nums" id="liveEq">0.00 = 1.35 · 0.00</span>
+          </div>
+
+          <div class="graph-wrap">
+            <span class="control-label">Velocidad angular ω vs tiempo t</span>
+            <canvas id="graphCanvas" width="320" height="160"></canvas>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ RESUMEN ============ -->
+    <section class="summary reveal">
+      <h2>Resumen en una tabla</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Concepto</th>
+              <th>Condición</th>
+              <th>Fórmula clave</th>
+              <th>En la puerta</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="tag tag-cyan sm">Estático</span></td>
+              <td>τ<sub>neto</sub> = 0</td>
+              <td class="mono">Στ = 0</td>
+              <td>Sostienes la puerta, no se mueve</td>
+            </tr>
+            <tr>
+              <td><span class="tag tag-amber sm">Dinámico</span></td>
+              <td>τ<sub>neto</sub> ≠ 0</td>
+              <td class="mono">τ = F·d·sen θ</td>
+              <td>Empujas y la puerta gira</td>
+            </tr>
+            <tr>
+              <td><span class="tag tag-magenta sm">Acel. angular</span></td>
+              <td>Cambio de ω</td>
+              <td class="mono">α = Δω / Δt</td>
+              <td>Cada vez gira más rápido</td>
+            </tr>
+            <tr>
+              <td><span class="tag tag-amber sm">τ = I·α</span></td>
+              <td>Segunda ley rotacional</td>
+              <td class="mono">τ = I·α</td>
+              <td>Puerta pesada → cuesta más acelerarla</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>Simulador de Torque · Proyecto de Física · Hecho con HTML, CSS y JavaScript</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
