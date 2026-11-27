@@ -587,6 +587,81 @@ td.mono { color: var(--amber); font-family: var(--mono); }
 .reveal.visible { opacity: 1; transform: none; }
 
 /* ============================================================
+   SWITCHES Y DOS MÓDULOS DEL SIMULADOR
+   ============================================================ */
+.sim-tabs {
+  max-width: 760px;
+  margin: 0 auto 18px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(17,24,39,.82);
+}
+.sim-tab {
+  min-height: 74px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-family: var(--sans);
+  transition: .22s ease;
+}
+.sim-tab b { display: block; color: var(--text); font-size: .98rem; }
+.sim-tab small { display: block; margin-top: 2px; font-family: var(--mono); }
+.sim-tab.active { background: var(--cyan-dim); border-color: rgba(34,211,238,.38); box-shadow: 0 8px 24px rgba(34,211,238,.10); }
+.tab-icon { width: 46px; height: 46px; flex: none; display: grid; place-items: center; border-radius: 50%; color: #04121a; background: var(--amber); font: 700 1.35rem var(--mono); }
+.tab-icon.mag { background: var(--magenta); }
+
+.solve-tabs { max-width: 760px; margin: 0 auto 18px; display: grid; grid-template-columns: repeat(4,1fr); gap: 7px; }
+.solve-tabs:has([data-angular-solve]) { grid-template-columns: repeat(3,1fr); }
+.solve-btn {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(148,163,184,.055);
+  color: var(--muted);
+  font: 600 .82rem var(--sans);
+  cursor: pointer;
+  transition: .18s ease;
+}
+.solve-btn:hover { border-color: var(--line-strong); color: var(--text); }
+.solve-btn.active { background: rgba(34,211,238,.13); border-color: rgba(34,211,238,.48); color: var(--cyan); }
+#angularModule .solve-btn.active { background: var(--magenta-dim); border-color: rgba(244,114,182,.48); color: var(--magenta); }
+
+.sim-module { display: none; }
+.sim-module.active { display: block; }
+.sim-layout.compact { grid-template-columns: 270px minmax(360px,1fr) 280px; }
+.control.hidden { display: none; }
+
+.result-card {
+  margin: 14px 0 8px;
+  padding: 12px 14px;
+  border: 1px solid rgba(251,191,36,.42);
+  border-radius: 10px;
+  background: var(--amber-dim);
+  text-align: center;
+}
+.result-card.magenta { border-color: rgba(244,114,182,.42); background: var(--magenta-dim); }
+.result-label { display: block; color: var(--muted); font: 600 .65rem var(--mono); text-transform: uppercase; letter-spacing: .1em; }
+.result-card strong { display: block; margin-top: 3px; color: var(--amber); font: 700 1.05rem var(--mono); }
+.result-card.magenta strong { color: var(--magenta); }
+.validation { min-height: 38px; margin: 8px 0 12px; color: #f87171; font: .78rem/1.45 var(--mono); }
+.validation.ok { color: var(--green); }
+.live-equation { margin-top: 16px; padding: 12px; border-radius: 9px; border: 1px solid var(--line); background: rgba(148,163,184,.04); color: var(--text); text-align: center; font: 600 .82rem/1.45 var(--mono); }
+.readout-grid.three { grid-template-columns: repeat(3,1fr); }
+.readout-grid.three .ro { min-width: 0; }
+.readout-grid.three .ro-value { font-size: 1.05rem; }
+
+/* ============================================================
    RESPONSIVE
    ============================================================ */
 @media (max-width: 1100px) {

@@ -545,508 +545,170 @@ function relationScene() {
 /* ============================================================
    SIMULADOR INTERACTIVO
    ============================================================ */
+/* ============================================================
+   NUEVO SIMULADOR CON DOS MODOS
+   ============================================================ */
 function simulator() {
-  const canvas = document.getElementById("simCanvas");
-  if (!canvas) return;
-
   const $ = (id) => document.getElementById(id);
-  const inputs = {
-    force: $("force"), dist: $("dist"), angle: $("angle"),
-    mass: $("mass"), width: $("width"), fric: $("fric"),
+
+  document.querySelectorAll('.sim-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.sim-tab').forEach((t) => {
+        t.classList.remove('active'); t.setAttribute('aria-selected','false');
+      });
+      tab.classList.add('active'); tab.setAttribute('aria-selected','true');
+      const angular = tab.dataset.sim === 'angular';
+      $('torqueModule').classList.toggle('active', !angular);
+      $('angularModule').classList.toggle('active', angular);
+    });
+  });
+
+  let torqueSolve = 'tau';
+  const torqueEls = {
+    force:$('torqueForce'), distance:$('torqueDistance'), angle:$('torqueAngle'), tau:$('torqueTau')
   };
-  const out = {
-    force: $("forceVal"), dist: $("distVal"), angle: $("angleVal"),
-    mass: $("massVal"), width: $("widthVal"), fric: $("fricVal"),
-    torque: $("roTorque"), inertia: $("roInertia"), alpha: $("roAlpha"),
-    omega: $("roOmega"), theta: $("roTheta"), state: $("roState"),
-    eq: $("liveEq"),
-  };
 
-  // Estado de la física
-  let mode = "static";
-  let theta = 0;      // ángulo de la puerta (rad), 0 = cerrada
-  let omega = 0;      // velocidad angular
-  let pushImpulse = 0;
-  let resistTimer = 0; // segundos que muestra "Resistiendo…" tras un empujón estático
+  function torqueValues() { return {F:+torqueEls.force.value,r:+torqueEls.distance.value,deg:+torqueEls.angle.value,tau:+torqueEls.tau.value}; }
 
-  // Estado para el modo estático: puerta fija en un ángulo de equilibrio
-  const staticTheta = Math.PI / 2.6;
-
-  // Historial para la gráfica
-  let graphData = [];
-  let graphTime = 0;
-
-  const MAX_ANGLE = Math.PI * 0.62;   // tope de apertura
-  const MIN_ANGLE = -0.05;
-
-  /* ---------- Lectura de parámetros ---------- */
-  function params() {
-    const F = +inputs.force.value;
-    const d = +inputs.dist.value * +inputs.width.value; // m del eje (proporcional al ancho)
-    const th = (+inputs.angle.value * Math.PI) / 180;    // ángulo entre r y F
-    const m = +inputs.mass.value;
-    const L = +inputs.width.value;
-    const fric = +inputs.fric.value;
-    const I = (1 / 3) * m * L * L;
-    const tau = F * d * Math.sin(th);
-    return { F, d, th, m, L, fric, I, tau };
-  }
-
-  /* ---------- Actualiza etiquetas ---------- */
-  function updateLabels() {
-    out.force.textContent = inputs.force.value;
-    out.dist.textContent = (+inputs.dist.value * +inputs.width.value).toFixed(2);
-    out.angle.textContent = inputs.angle.value;
-    out.mass.textContent = inputs.mass.value;
-    out.width.textContent = (+inputs.width.value).toFixed(2);
-    out.fric.textContent = (+inputs.fric.value).toFixed(2);
-
-    // pintar el track del range
-    Object.values(inputs).forEach((el) => {
-      const pct = ((el.value - el.min) / (el.max - el.min)) * 100;
-      el.style.background = `linear-gradient(90deg, #22d3ee 0%, #22d3ee ${pct}%, rgba(148,163,184,0.2) ${pct}%)`;
+  function updateTorqueTracks() {
+    Object.values(torqueEls).forEach((el) => {
+      const pct=((+el.value-+el.min)/(+el.max-+el.min))*100;
+      el.style.background=`linear-gradient(90deg,#22d3ee 0%,#22d3ee ${pct}%,rgba(148,163,184,.2) ${pct}%)`;
     });
   }
 
-  /* ---------- Modo ---------- */
-  document.querySelectorAll(".mode-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".mode-btn").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      mode = btn.dataset.mode;
-      resetSim();
-    });
-  });
+  function updateTorque() {
+    const v=torqueValues();
+    $('forceVal').textContent=v.F.toFixed(0); $('distanceVal').textContent=v.r.toFixed(2);
+    $('angleVal').textContent=v.deg.toFixed(0); $('torqueVal').textContent=v.tau.toFixed(1);
+    let result=0, message='', valid=true;
+    const theta=v.deg*Math.PI/180, sin=Math.sin(theta);
 
-  /* ---------- Presets ---------- */
-  document.querySelectorAll("[data-preset]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const p = btn.dataset.preset;
-      if (p === "light") { inputs.mass.value = 10; inputs.width.value = 0.7; inputs.force.value = 55; inputs.fric.value = 0.3; }
-      if (p === "heavy") { inputs.mass.value = 70; inputs.width.value = 1.3; inputs.force.value = 110; inputs.fric.value = 1.4; }
-      if (p === "edge") { inputs.dist.value = 1; inputs.force.value = 45; inputs.angle.value = 90; }
-      resetSim();
+    if (torqueSolve==='tau') {
+      result=v.F*v.r*sin;
+      $('torqueResultValue').textContent=`τ = ${result.toFixed(1)} N·m`;
+      $('torqueEquation').textContent=`τ = ${v.F} × ${v.r.toFixed(2)} × sen ${v.deg}° = ${result.toFixed(1)} N·m`;
+      if (Math.abs(sin)<0.0001) message='θ = 0° o 180°: la fuerza es paralela al brazo, así que el torque es cero.';
+    }
+    if (torqueSolve==='force') {
+      if (Math.abs(v.r*sin)<0.0001) { valid=false; message='No existe solución con r · sen θ = 0.'; }
+      else result=v.tau/(v.r*sin);
+      if(valid&&result>200) {valid=false;message=`F excede el límite: ${result.toFixed(1)} N (máximo 200 N).`;}
+      $('torqueResultValue').textContent=valid?`F = ${Math.max(0,result).toFixed(1)} N`:'F sin solución';
+      $('torqueEquation').textContent=`F = τ / (r · sen θ) = ${valid?result.toFixed(1):'—'} N`;
+    }
+    if (torqueSolve==='distance') {
+      if (Math.abs(v.F*sin)<0.0001) {valid=false;message='No existe solución con F · sen θ = 0.';}
+      else result=v.tau/(v.F*sin);
+      if(valid&&(result<0.05||result>2)){valid=false;message=`r excede los límites: ${result.toFixed(2)} m (rango 0.05–2 m).`;}
+      $('torqueResultValue').textContent=valid?`r = ${Math.max(0,result).toFixed(2)} m`:'r sin solución';
+      $('torqueEquation').textContent=`r = τ / (F · sen θ) = ${valid?result.toFixed(2):'—'} m`;
+    }
+    if (torqueSolve==='angle') {
+      const ratio=v.tau/(v.F*v.r);
+      if(v.F<=0||v.r<=0.05){valid=false;message='Necesitas F > 0 y r ≥ 0.05 m.';}
+      else if(ratio>1){valid=false;message='Sin solución: τ no puede superar F · r. Máximo posible = '+(v.F*v.r).toFixed(1)+' N·m.';}
+      else result=Math.asin(Math.max(0,ratio))*180/Math.PI;
+      $('torqueResultValue').textContent=valid?`θ = ${result.toFixed(1)}°`:'θ sin solución';
+      $('torqueEquation').textContent=`θ = arcsen(τ / (F · r)) = ${valid?result.toFixed(1)+'°':'—'}`;
+    }
+
+    $('torqueReadForce').textContent=torqueSolve==='force'&&valid?Math.max(0,result).toFixed(1):v.F.toFixed(0);
+    $('torqueReadDistance').textContent=torqueSolve==='distance'&&valid?Math.max(0,result).toFixed(2):v.r.toFixed(2);
+    $('torqueReadAngle').textContent=torqueSolve==='angle'&&valid?result.toFixed(1):v.deg.toFixed(0);
+    const val=$('torqueValidation'); val.textContent=message; val.classList.toggle('ok',valid&&!message);
+    updateTorqueTracks();
+  }
+
+  function showTorqueFields() {
+    document.querySelectorAll('[data-field]').forEach((el)=>el.classList.add('hidden'));
+    const groups={tau:['force','distance','angle'],force:['torque','distance','angle'],distance:['torque','force','angle'],angle:['torque','force','distance']};
+    groups[torqueSolve].forEach((x)=>document.querySelector(`[data-field="${x}"]`)?.classList.remove('hidden'));
+  }
+
+  document.querySelectorAll('[data-solve]').forEach((btn)=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('[data-solve]').forEach((b)=>b.classList.remove('active')); btn.classList.add('active');
+      torqueSolve=btn.dataset.solve; showTorqueFields(); updateTorque();
     });
   });
+  Object.values(torqueEls).forEach((el)=>el.addEventListener('input',updateTorque));
+  $('torqueReset').addEventListener('click',()=>{torqueEls.force.value=60;torqueEls.distance.value=.8;torqueEls.angle.value=90;torqueEls.tau.value=48;updateTorque();});
 
-  function resetSim() {
-    theta = mode === "static" ? staticTheta : 0;
-    omega = 0;
-    pushImpulse = 0;
-    resistTimer = 0;
-    graphData = [];
-    graphTime = 0;
+  function drawTorqueCanvas() {
+    const canvas=$('torqueCanvas'); if(!canvas)return;
+    const rect=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);
+    if(canvas.width!==Math.round(rect.width*dpr)){canvas.width=Math.round(rect.width*dpr);canvas.height=Math.round(rect.width*460/720*dpr);} 
+    const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);const w=rect.width,h=rect.width*460/720;
+    ctx.clearRect(0,0,w,h);drawGrid(ctx,w,h,26);
+    const v=torqueValues();let F=v.F,r=v.r,deg=v.deg,tau=v.tau;const sin=Math.sin(v.deg*Math.PI/180);
+    if(torqueSolve==='force'&&Math.abs(v.r*sin)>0.0001){F=Math.min(v.tau/(v.r*sin),200);} 
+    if(torqueSolve==='distance'&&Math.abs(v.F*sin)>0.0001){r=Math.max(.05,Math.min(v.tau/(v.F*sin),2));}
+    if(torqueSolve==='angle'&&v.F*v.r>0){deg=Math.asin(Math.min(1,v.tau/(v.F*v.r)))*180/Math.PI;}
+    const theta=deg*Math.PI/180,tauEff=F*r*Math.sin(theta),hx=w*.20,hy=h*.78,base=-Math.PI/2;
+    const len=Math.min(w*.62,h*.50)*(r/2);const ang=base+(torqueSolve==='tau'?Math.sin(performance.now()/900)*.12:theta*.04);
+    drawDoorPanel(ctx,hx,hy,ang,Math.max(150,len),24,{fill:'rgba(34,211,238,.09)',stroke:C.cyan});drawHinge(ctx,hx,hy,9);
+    const px=hx+Math.cos(ang)*len*.88,py=hy+Math.sin(ang)*len*.88;
+    ctx.save();ctx.setLineDash([6,5]);ctx.strokeStyle=C.cyan;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(hx,hy);ctx.lineTo(px,py);ctx.stroke();ctx.restore();
+    const fa=ang+theta;drawArrow(ctx,px,py,px+Math.cos(fa)*(44+F*.22),py+Math.sin(fa)*(44+F*.22),C.amber,3.5,11);
+    label(ctx,`F=${F.toFixed(1)} N`,px+Math.cos(fa)*75,py+Math.sin(fa)*75,C.amber,12,'center',true);
+    label(ctx,`r=${r.toFixed(2)} m`,(hx+px)/2,(hy+py)/2,C.cyan,12,'center',true);
+    drawArcArrow(ctx,hx,hy,42,ang+.08,ang+.08+(tauEff>=0?1.15:-1.15),C.magenta,3);
+    label(ctx,`τ=${tauEff.toFixed(1)} N·m`,w*.5,30,C.magenta,14,'center',true);
   }
 
-  $("resetBtn").addEventListener("click", resetSim);
+  let angularSolve='alpha',angularT=0,angularRunning=true;
+  const angularEls={alpha:$('alphaInput'),omega:$('omegaInput'),time:$('timeInput')};
+  function angularValues(){return{alpha:+angularEls.alpha.value,omega:+angularEls.omega.value,time:+angularEls.time.value};}
+  function updateAngularTracks(){Object.values(angularEls).forEach(el=>{const pct=((+el.value-+el.min)/(+el.max-+el.min))*100;el.style.background=`linear-gradient(90deg,#f472b6 0%,#f472b6 ${pct}%,rgba(148,163,184,.2) ${pct}%)`;});}
 
-  // Etiqueta flotante que aparece en el canvas al empujar
-  let pushToast = null; // { text, color, t }
-
-  $("pushBtn").addEventListener("click", (e) => {
-    // animación de pulsación del botón
-    const btn = e.currentTarget;
-    btn.classList.remove("pulse");
-    void btn.offsetWidth; // reinicia la animación
-    btn.classList.add("pulse");
-
-    if (mode === "dynamic") {
-      // empujón fuerte: impulso angular notable (aunque F = 0)
-      pushImpulse = 18;
-      pushToast = { text: "¡Empujón! ω aumenta", color: "#f472b6", t: 1.4 };
-    } else {
-      // modo estático: perturbación momentánea que el torque
-      // de resistencia compensa → la puerta regresa al equilibrio
-      pushImpulse = 14;
-      resistTimer = 1.6; // muestra "Resistiendo…" en el panel
-      pushToast = { text: "τ resistente lo compensa → equilibrio", color: "#34d399", t: 1.8 };
-    }
-  });
-
-  Object.values(inputs).forEach((el) => el.addEventListener("input", updateLabels));
-  updateLabels();
-
-  /* ---------- Física ---------- */
-  function physics(dt) {
-    const { I, tau, fric } = params();
-
-    if (mode === "static") {
-      // Equilibrio: la puerta se mantiene en su ángulo.
-      // Si el torque aplicado no alcanza para "sostenerla", tiende a cerrarse
-      // y se muestra el torque de resistencia que lo compensa.
-      const desired = staticTheta;
-      // resorte que representa el torque de resistencia (gravedad/balance)
-      const k = 14;
-      const tauResist = -k * (theta - desired);
-      // amortiguamiento
-      omega += (tauResist / I - omega * 2.2) * dt;
-      omega = Math.max(-4, Math.min(4, omega));
-      theta += omega * dt;
-
-      // empujón del botón: perturbación momentánea que el torque
-      // de resistencia compensa (la puerta se desplaza y regresa)
-      if (pushImpulse !== 0) {
-        omega += pushImpulse / I;
-        pushImpulse = 0;
-      }
-      if (resistTimer > 0) resistTimer -= dt;
-    } else {
-      // Dinámico: τ_neto = τ_aplicada − fricción·signo(ω) − resorte de tope
-      let alpha = tau / I;
-
-      // impulso del botón (empujón)
-      if (pushImpulse > 0) {
-        omega += pushImpulse / I;
-        pushImpulse = 0;
-      }
-
-      // fricción viscosa de la bisagra
-      alpha -= (fric * omega) / I;
-
-      // fricción seca cuando casi no se mueve -> se detiene
-      if (Math.abs(omega) < 0.12 && Math.abs(tau) < 0.6) {
-        alpha -= (omega * 6) / I;
-      }
-
-      omega += alpha * dt;
-      theta += omega * dt;
-
-      // topes con rebote
-      if (theta > MAX_ANGLE) { theta = MAX_ANGLE; omega = -Math.abs(omega) * 0.35; }
-      if (theta < MIN_ANGLE) { theta = MIN_ANGLE; omega = Math.abs(omega) * 0.35; }
-    }
+  function updateAngular(){
+    const v=angularValues();let alpha=v.alpha,omega=v.omega,t=v.time,msg='',valid=true;
+    $('alphaVal').textContent=v.alpha.toFixed(1);$('omegaVal').textContent=v.omega.toFixed(1);$('timeVal').textContent=v.time.toFixed(1);
+    if(angularSolve==='alpha'){alpha=v.omega/v.time;if(!Number.isFinite(alpha)||alpha>20){valid=false;msg='α excede el rango máximo de 20 rad/s².';}}
+    if(angularSolve==='omega'){omega=v.alpha*v.time;if(omega>30){valid=false;msg='Δω excede el rango máximo de 30 rad/s.';}}
+    if(angularSolve==='time'){if(v.alpha<=0){valid=false;msg='No existe Δt finito cuando α = 0.';}else{t=v.omega/v.alpha;if(t<.5||t>10){valid=false;msg=`Δt excede el rango permitido: ${t.toFixed(2)} s.`;}}}
+    $('angularResultValue').textContent=angularSolve==='alpha'?`α = ${valid?alpha.toFixed(2):'—'} rad/s²`:angularSolve==='omega'?`Δω = ${valid?omega.toFixed(2):'—'} rad/s`:`Δt = ${valid?t.toFixed(2):'—'} s`;
+    $('angularEquation').textContent=`α = ${omega.toFixed(1)} / ${t.toFixed(1)} = ${valid?alpha.toFixed(2):'—'} rad/s²`;
+    $('angularReadAlpha').textContent=valid?alpha.toFixed(2):'—';$('angularReadOmega').textContent=omega.toFixed(1);$('angularReadTime').textContent=t.toFixed(1);
+    const av=$('angularValidation');av.textContent=msg;av.classList.toggle('ok',valid&&!msg);updateAngularTracks();return{alpha,omega,time:t,valid};
   }
 
-  /* ---------- Dibujo del simulador ---------- */
-  function draw() {
-    const rect = canvas.getBoundingClientRect();
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    if (canvas.width !== Math.round(rect.width * dpr)) {
-      canvas.width = Math.round(rect.width * dpr);
-      canvas.height = Math.round((rect.width * 460) / 720 * dpr);
-    }
-    const ctx = canvas.getContext("2d");
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const w = rect.width;
-    const h = (rect.width * 460) / 720;
+  function showAngularFields(){document.querySelectorAll('[data-angular-field]').forEach(el=>el.classList.add('hidden'));const groups={alpha:['omega','time'],omega:['alpha','time'],time:['alpha','omega']};groups[angularSolve].forEach(x=>document.querySelector(`[data-angular-field="${x}"]`)?.classList.remove('hidden'));}
+  document.querySelectorAll('[data-angular-solve]').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('[data-angular-solve]').forEach(b=>b.classList.remove('active'));btn.classList.add('active');angularSolve=btn.dataset.angularSolve;showAngularFields();angularT=0;angularRunning=true;updateAngular();}));
+  Object.values(angularEls).forEach(el=>el.addEventListener('input',()=>{angularT=0;angularRunning=true;updateAngular();}));
+  $('angularReset').addEventListener('click',()=>{angularEls.alpha.value=2;angularEls.omega.value=8;angularEls.time.value=4;angularT=0;angularRunning=true;updateAngular();});
+  $('angularRepeat').addEventListener('click',()=>{angularT=0;angularRunning=true;});
 
-    ctx.clearRect(0, 0, w, h);
-    drawGrid(ctx, w, h, 26);
-
-    const { F, d: arm, th, L } = params();
-
-    // geometría de la puerta
-    const hx = w * 0.22;
-    const hy = h * 0.82;
-    const scale = Math.min(w * 0.62, h * 0.72) / Math.max(L, 0.6);
-    const doorLen = L * scale;
-    const thick = Math.max(16, 26 * (0.7 + L * 0.3));
-    const ang = -Math.PI / 2 + theta; // puerta hacia arriba, rota con theta
-
-    // suelo / pared
-    ctx.save();
-    ctx.strokeStyle = "rgba(148,163,184,0.4)";
-    ctx.lineWidth = 3;
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(hx - 46, hy + thick / 2 + 8);
-    ctx.lineTo(hx + doorLen + 30, hy + thick / 2 + 8);
-    ctx.stroke();
-    // muro de la bisagra
-    ctx.strokeStyle = "rgba(148,163,184,0.5)";
-    ctx.lineWidth = 2;
-    for (let i = 0; i < 6; i++) {
-      const x = hx - 46 + i * 8;
-      ctx.beginPath();
-      ctx.moveTo(x, hy + thick / 2 + 8);
-      ctx.lineTo(x - 7, hy + thick / 2 + 20);
-      ctx.stroke();
-    }
-    ctx.restore();
-
-    // puerta
-    drawDoorPanel(ctx, hx, hy, ang, doorLen, thick, {
-      fill: mode === "static" ? "rgba(34,211,238,0.10)" : "rgba(251,191,36,0.10)",
-      stroke: mode === "static" ? C.cyan : C.amber,
-    });
-
-    // punto de aplicación (proporcional al ancho)
-    const appFrac = Math.min(arm / L, 1);
-    const px = hx + Math.cos(ang) * doorLen * appFrac;
-    const py = hy + Math.sin(ang) * doorLen * appFrac;
-
-    // brazo r (línea discontinua desde el eje)
-    ctx.save();
-    ctx.setLineDash([7, 6]);
-    ctx.strokeStyle = C.cyan;
-    ctx.lineWidth = 2;
-    ctx.shadowColor = C.cyan;
-    ctx.shadowBlur = 6;
-    ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(px, py); ctx.stroke();
-    ctx.restore();
-    label(ctx, `r = ${arm.toFixed(2)} m`, (hx + px) / 2 + 14, (hy + py) / 2, C.cyan, 12, "left", true);
-
-    // ángulo θ entre r y F (arco)
-    if (th > 0.05 && th < Math.PI - 0.05) {
-      const arcR = 40;
-      const a0 = ang;
-      const a1 = ang + th;
-      ctx.save();
-      ctx.strokeStyle = "rgba(226,232,240,0.6)";
-      ctx.lineWidth = 1.6;
-      ctx.setLineDash([4, 4]);
-      ctx.beginPath(); ctx.arc(hx, hy, arcR, Math.min(a0, a1), Math.max(a0, a1)); ctx.stroke();
-      ctx.restore();
-      const mid = ang + th / 2;
-      label(ctx, `θ=${Math.round(th * 180 / Math.PI)}°`, hx + Math.cos(mid) * (arcR + 20), hy + Math.sin(mid) * (arcR + 20), C.white, 11, "center");
-    }
-
-    // vector fuerza F
-    const fAng = ang + th; // dirección de F respecto al brazo
-    const fLen = 40 + F * 0.55;
-    if (F > 0.5) {
-      drawArrow(ctx, px, py, px + Math.cos(fAng) * fLen, py + Math.sin(fAng) * fLen, C.amber, 4, 13);
-      label(ctx, `F = ${F.toFixed(0)} N`, px + Math.cos(fAng) * (fLen + 14), py + Math.sin(fAng) * (fLen + 14), C.amber, 13, "center", true);
-    }
-
-    // punto de aplicación
-    ctx.save();
-    ctx.fillStyle = C.white;
-    ctx.shadowColor = C.white;
-    ctx.shadowBlur = 10;
-    ctx.beginPath(); ctx.arc(px, py, 5, 0, TAU); ctx.fill();
-    ctx.restore();
-
-    // torque: arco grande desde el eje
-    const { tau } = params();
-    if (Math.abs(tau) > 0.05) {
-      const dir = tau >= 0 ? 1 : -1;
-      const base = ang;
-      const span = 1.3 * Math.min(1, Math.abs(tau) / 40 + 0.3);
-      drawArcArrow(ctx, hx, hy, Math.min(doorLen * 0.5, 92), base + 0.05 * dir, base + span * dir, C.white, 3.5);
-      const midA = base + (span / 2) * dir;
-      const rr = Math.min(doorLen * 0.5, 92) + 22;
-      label(ctx, `τ = ${tau.toFixed(1)} N·m`, hx + Math.cos(midA) * rr, hy + Math.sin(midA) * rr, C.white, 13, "center", true);
-    }
-
-    // ω: flecha de velocidad en el extremo
-    if (Math.abs(omega) > 0.08) {
-      const tipX = hx + Math.cos(ang) * doorLen;
-      const tipY = hy + Math.sin(ang) * doorLen;
-      const dir = omega >= 0 ? 1 : -1;
-      drawArcArrow(ctx, hx, hy, doorLen + 26, ang - 0.9 * dir, ang + 0.3 * dir, C.magenta, 3);
-      label(ctx, `ω ${omega >= 0 ? "↺" : "↻"} ${Math.abs(omega).toFixed(2)} rad/s`, w - 16, 26, C.magenta, 13, "right", true);
-    }
-
-    drawHinge(ctx, hx, hy, 10);
-
-    // estado estático: flechas de torque opuestas + etiqueta
-    if (mode === "static") {
-      const tauApplied = tau;
-      const tauResist = -14 * (theta - staticTheta); // igual que en physics
-      // indicador visual de equilibrio
-      ctx.save();
-      ctx.fillStyle = "rgba(52,211,153,0.12)";
-      ctx.strokeStyle = C.green;
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([5, 5]);
-      const bw = 176, bh = 34, bx = w - bw - 14, by = h - bh - 14;
-      ctx.beginPath();
-      ctx.roundRect ? ctx.roundRect(bx, by, bw, bh, 8) : ctx.rect(bx, by, bw, bh);
-      ctx.fill(); ctx.stroke();
-      ctx.restore();
-      label(ctx, `τ₁ ${tauApplied.toFixed(1)}  =  τ₂ ${Math.abs(tauResist).toFixed(1)}`, bx + bw / 2, by + bh / 2, C.green, 13, "center", true);
-    }
-
-    // hint
-    label(ctx, mode === "static"
-      ? "Modo estático: la puerta permanece en equilibrio (τ neto = 0)"
-      : "Modo dinámico: τ neto ≠ 0 → la puerta gira", 16, 24, C.muted, 12.5, "left");
-
-    // etiqueta flotante tras pulsar "Empujar"
-    if (pushToast && pushToast.t > 0) {
-      const p = 1 - pushToast.t / 1.8;          // 0 → 1 durante la vida del toast
-      const alpha = Math.min(1, pushToast.t * 2.5);
-      const y = h * 0.42 - p * 34;               // flota hacia arriba
-      ctx.save();
-      ctx.globalAlpha = alpha;
-      const text = pushToast.text;
-      ctx.font = '600 15px "IBM Plex Mono", monospace';
-      const tw = ctx.measureText(text).width + 30;
-      const tx = w / 2 - tw / 2;
-      ctx.fillStyle = "rgba(8,12,20,0.92)";
-      ctx.strokeStyle = pushToast.color;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.roundRect ? ctx.roundRect(tx, y - 16, tw, 32, 16) : ctx.rect(tx, y - 16, tw, 32);
-      ctx.fill();
-      ctx.stroke();
-      ctx.restore();
-      label(ctx, text, w / 2, y, pushToast.color, 15, "center", true);
-    }
+  function drawAngularCanvas(){
+    const canvas=$('angularSimCanvas');if(!canvas)return;
+    const rect=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);
+    if(canvas.width!==Math.round(rect.width*dpr)){canvas.width=Math.round(rect.width*dpr);canvas.height=Math.round(rect.width*460/720*dpr);} 
+    const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);const w=rect.width,h=rect.width*460/720;ctx.clearRect(0,0,w,h);drawGrid(ctx,w,h,26);
+    const v=updateAngular();if(angularRunning&&v.valid){angularT=Math.min(v.time,angularT+1/60);if(angularT>=v.time)angularRunning=false;}
+    const progress=v.time>0?Math.min(1,angularT/v.time):0,omegaNow=v.valid?v.alpha*angularT:0,cx=w*.28,cy=h*.52,R=Math.min(w,h)*.27,angle=omegaNow*1.25;
+    ctx.save();ctx.fillStyle='rgba(34,211,238,.08)';ctx.strokeStyle=C.cyan;ctx.lineWidth=8;ctx.beginPath();ctx.arc(cx,cy,R,0,TAU);ctx.fill();ctx.stroke();ctx.restore();
+    ctx.save();ctx.translate(cx,cy);ctx.rotate(angle);ctx.strokeStyle=C.white;ctx.lineWidth=4;for(let i=0;i<8;i++){const a=i*TAU/8;ctx.beginPath();ctx.moveTo(Math.cos(a)*R*.28,Math.sin(a)*R*.28);ctx.lineTo(Math.cos(a)*R*.82,Math.sin(a)*R*.82);ctx.stroke();}ctx.restore();drawHinge(ctx,cx,cy,6);
+    drawArcArrow(ctx,cx,cy,R+24,-.8,1.15,C.magenta,4);label(ctx,`ω = ${omegaNow.toFixed(2)} rad/s`,cx,cy+R+38,C.magenta,14,'center',true);
+    const gx=w*.58,gy=h*.18,gw=w*.34,gh=h*.58,maxW=Math.max(v.omega,1);
+    ctx.save();ctx.strokeStyle=C.line;ctx.lineWidth=1.5;ctx.strokeRect(gx,gy,gw,gh);ctx.strokeStyle='rgba(148,163,184,.45)';ctx.beginPath();ctx.moveTo(gx,gy+gh);ctx.lineTo(gx+gw,gy+gh);ctx.moveTo(gx,gy+gh);ctx.lineTo(gx,gy);ctx.stroke();ctx.restore();
+    ctx.save();ctx.strokeStyle=C.magenta;ctx.lineWidth=3;ctx.shadowColor=C.magenta;ctx.shadowBlur=8;ctx.beginPath();ctx.moveTo(gx,gy+gh);ctx.lineTo(gx+gw*progress,gy+gh-gh*(v.valid?(v.alpha*angularT/maxW):0));ctx.stroke();ctx.restore();
+    label(ctx,'ω',gx-18,gy,C.magenta,11,'center');label(ctx,'t',gx+gw,gy+gh+18,C.muted,11,'right');label(ctx,`α = ${v.alpha.toFixed(2)} rad/s²`,gx+gw/2,gy-18,C.amber,12,'center',true);
   }
 
-  /* ---------- Panel de lecturas ---------- */
-  function updateReadouts() {
-    const { I, tau, fric } = params();
-    let alpha;
-    if (mode === "static") {
-      // en equilibrio la aceleración es ~0; mostramos la que generaría el τ aplicado
-      alpha = 0;
-    } else {
-      alpha = (tau - fric * omega) / I;
-    }
-
-    out.torque.textContent = tau.toFixed(2);
-    out.inertia.textContent = I.toFixed(2);
-    out.alpha.textContent = alpha.toFixed(2);
-    out.omega.textContent = omega.toFixed(2);
-    out.theta.textContent = ((theta * 180) / Math.PI).toFixed(0);
-    out.eq.textContent = `${tau.toFixed(2)} = ${I.toFixed(2)} · ${alpha.toFixed(2)}`;
-
-    let state;
-    if (mode === "static") {
-      state = resistTimer > 0 ? "🛡 Resistiendo…" : "⚡ Equilibrio (τ = 0)";
-    }
-    else if (Math.abs(omega) < 0.05 && Math.abs(alpha) < 0.05) state = "En reposo";
-    else if (omega > 0.05) state = "▲ Girando (antihorario)";
-    else if (omega < -0.05) state = "▼ Girando (horario)";
-    else state = "Acelerando";
-    if (out.state.textContent !== state) {
-      out.state.textContent = state;
-      out.state.parentElement.classList.remove("flash");
-      void out.state.offsetWidth;
-      out.state.parentElement.classList.add("flash");
-    }
+  function drawAngularGraph(){
+    const canvas=$('angularGraphCanvas');if(!canvas)return;
+    const rect=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);
+    if(canvas.width!==Math.round(rect.width*dpr)){canvas.width=Math.round(rect.width*dpr);canvas.height=Math.round(rect.width*160/320*dpr);}
+    const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);const w=rect.width,h=rect.width*160/320;ctx.clearRect(0,0,w,h);
+    const v=updateAngular(),pad=26,gx=pad*.8,gy=pad*.45,gw=w-pad*1.4,gh=h-pad*1.5,maxW=Math.max(v.omega,1);
+    ctx.strokeStyle='rgba(148,163,184,.45)';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(gx,gy);ctx.lineTo(gx,gy+gh);ctx.lineTo(gx+gw,gy+gh);ctx.stroke();
+    const progress=v.time>0?Math.min(1,angularT/v.time):0;ctx.save();ctx.strokeStyle=C.magenta;ctx.lineWidth=2.5;ctx.shadowColor=C.magenta;ctx.shadowBlur=7;ctx.beginPath();ctx.moveTo(gx,gy+gh);ctx.lineTo(gx+gw*progress,gy+gh-gh*(progress*v.omega/maxW));ctx.stroke();ctx.restore();
+    label(ctx,'ω',gx-12,gy,C.magenta,10,'center');label(ctx,'t',gx+gw,gy+gh+14,C.muted,10,'right');
   }
 
-  /* ---------- Gráfica ω vs t ---------- */
-  const graph = document.getElementById("graphCanvas");
-  function drawGraph() {
-    if (!graph) return;
-    const rect = graph.getBoundingClientRect();
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    if (graph.width !== Math.round(rect.width * dpr)) {
-      graph.width = Math.round(rect.width * dpr);
-      graph.height = Math.round((rect.width * 160) / 320 * dpr);
-    }
-    const ctx = graph.getContext("2d");
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const w = rect.width;
-    const h = (rect.width * 160) / 320;
-
-    ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = "rgba(8,12,20,0.6)";
-    ctx.fillRect(0, 0, w, h);
-
-    const pad = 26;
-    const gw = w - pad * 1.4, gh = h - pad * 1.6;
-    const gx = pad * 0.8, gy = pad * 0.5;
-
-    // ejes
-    ctx.strokeStyle = "rgba(148,163,184,0.45)";
-    ctx.lineWidth = 1.3;
-    ctx.beginPath();
-    ctx.moveTo(gx, gy); ctx.lineTo(gx, gy + gh); ctx.lineTo(gx + gw, gy + gh);
-    ctx.stroke();
-    // línea cero
-    const maxAbsW = Math.max(2, ...graphData.map((p) => Math.abs(p.w)));
-    const zeroY = gy + gh / 2;
-    ctx.save();
-    ctx.strokeStyle = "rgba(148,163,184,0.3)";
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath(); ctx.moveTo(gx, zeroY); ctx.lineTo(gx + gw, zeroY); ctx.stroke();
-    ctx.restore();
-
-    label(ctx, "ω", gx - 14, gy + 6, C.magenta, 11, "center");
-    label(ctx, "t", gx + gw + 8, gy + gh + 4, C.muted, 11, "center");
-
-    if (graphData.length < 2) {
-      label(ctx, "esperando datos…", gx + gw / 2, gy + gh / 2, "rgba(148,163,184,0.6)", 11, "center");
-      return;
-    }
-
-    const maxT = Math.max(2, graphData[graphData.length - 1].t);
-    const toX = (t) => gx + (t / maxT) * gw;
-    const toY = (v) => zeroY - (v / maxAbsW) * (gh / 2);
-
-    // área bajo la curva
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(toX(graphData[0].t), zeroY);
-    graphData.forEach((p) => ctx.lineTo(toX(p.t), toY(p.w)));
-    ctx.lineTo(toX(graphData[graphData.length - 1].t), zeroY);
-    ctx.closePath();
-    const grad = ctx.createLinearGradient(0, gy, 0, gy + gh);
-    grad.addColorStop(0, "rgba(244,114,182,0.28)");
-    grad.addColorStop(1, "rgba(244,114,182,0.02)");
-    ctx.fillStyle = grad;
-    ctx.fill();
-    ctx.restore();
-
-    // línea
-    ctx.save();
-    ctx.strokeStyle = C.magenta;
-    ctx.lineWidth = 2.5;
-    ctx.shadowColor = C.magenta;
-    ctx.shadowBlur = 8;
-    ctx.lineJoin = "round";
-    ctx.beginPath();
-    graphData.forEach((p, i) => {
-      const x = toX(p.t), y = toY(p.w);
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-    ctx.restore();
-
-    // punto actual
-    const last = graphData[graphData.length - 1];
-    ctx.save();
-    ctx.fillStyle = C.magenta;
-    ctx.shadowColor = C.magenta;
-    ctx.shadowBlur = 10;
-    ctx.beginPath(); ctx.arc(toX(last.t), toY(last.w), 4, 0, TAU); ctx.fill();
-    ctx.restore();
-
-    label(ctx, `${last.w.toFixed(2)} rad/s`, gx + gw - 4, gy + 8, C.magenta, 10.5, "right", true);
-  }
-
-  /* ---------- Bucle principal ---------- */
-  let last = performance.now();
-  let graphAcc = 0;
-
-  function loop(now) {
-    let dt = (now - last) / 1000;
-    last = now;
-    dt = Math.min(dt, 0.05); // pestañas en background
-
-    if (!reduceMotion || document.hasFocus()) {
-      physics(dt);
-
-      // decae la etiqueta flotante del empujón
-      if (pushToast) {
-        pushToast.t -= dt;
-        if (pushToast.t <= 0) pushToast = null;
-      }
-
-      graphTime += dt;
-      graphAcc += dt;
-      if (graphAcc > 0.05) {
-        graphAcc = 0;
-        graphData.push({ t: graphTime, w: omega });
-        if (graphData.length > 400) graphData.shift();
-        if (graphTime > 8) { graphData = graphData.filter((p) => p.t > graphTime - 8); }
-      }
-    }
-
-    draw();
-    updateReadouts();
-    drawGraph();
-    requestAnimationFrame(loop);
-  }
-
-  resetSim();
-  requestAnimationFrame((t) => { last = t; requestAnimationFrame(loop); });
+  showTorqueFields();showAngularFields();updateTorque();updateAngular();
+  function loop(){if($('torqueModule').classList.contains('active'))drawTorqueCanvas();else drawAngularCanvas();drawAngularGraph();requestAnimationFrame(loop);}loop();
 }
 
 /* ============================================================
